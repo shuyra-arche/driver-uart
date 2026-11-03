@@ -1,0 +1,16 @@
+[package]
+name = "uart-wire-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Standalone host workspace: the test pins the cross-repository wire boundary by
+# exercising the actual published `uart-api` path, not a copy of the codec.
+[workspace]
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+uart-api = { path = "../../api" }
+wire = { git = "https://github.com/shuyra-arche/wire.git", rev = "0ff77dc4573fa2620d2fe995a18c01949d9c7e57" }
