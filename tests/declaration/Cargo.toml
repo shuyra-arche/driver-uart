@@ -1,0 +1,20 @@
+[package]
+name = "uart-declaration-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Standalone host workspace: exercises the actual declaration crate and its
+# public UNIT/BUILD values, not a copy of the declaration.
+[workspace]
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+uart-declaration = { path = "../../declaration" }
+system-api = { git = "https://github.com/shuyra-arche/system.git", rev = "9e5d63ca536a176583cf1b0054b4ecf7ddd88257" }
+unit = { git = "https://github.com/shuyra-arche/unit.git", rev = "90396f0fda376e0693fb1b9553aa21864d241057" }
+
+[dev-dependencies]
+env = { git = "https://github.com/shuyra-arche/env.git", rev = "d3000253cd5d13d466e91fafd4dbb27a5ec5aaae" }
