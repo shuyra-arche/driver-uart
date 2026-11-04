@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = ["api", "client"]
-# The host wire tests are a separate workspace, matching the other public providers.
+members = ["api", "client", "declaration", "server"]
+# The standalone host test workspaces are excluded from the package workspace.
 exclude = ["tests"]
 
 [workspace.package]
