@@ -1,0 +1,36 @@
+schema = 1
+id = "uart"
+
+[loader]
+image = "uart"
+space = "user"
+args = []
+stack = 0
+
+[[operator.namespace]]
+key = "service"
+placement = "shared"
+path = "uart"
+scope = "subtree"
+ops = 279 # PART | UNPART | BIND | UNBIND | FIND
+permit = "public"
+bindings = []
+
+[identity]
+aliases = []
+grants = []
+
+[control]
+creation = "startup"
+# The host always includes System; System bootstraps Operator before ordinary Units.
+requires = ["hub", "router"]
+after = ["hub", "router"]
+ready = { signal = "9887014109901452468" } # unit::READY_MARK
+ending = "resident"
+construction = []
+retirement = []
+groups = []
+guarded = false
+
+[supply]
+bindings = []
