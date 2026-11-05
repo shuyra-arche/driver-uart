@@ -74,6 +74,58 @@ identity/supply, ordered startup dependencies, readiness signal, resident
 ending, `UNIT.valid()`, and the `BUILD` package/binary contract including the
 manifest path.
 
+## Runtime Unit document
+
+The root `unit.toml` belongs to this UART Unit. Its stable `id` and
+`loader.image` are `uart`, matching the actual binary in the `uart-server`
+package at `server/Cargo.toml`. Build target, profile and features remain in
+the existing `BUILD` declaration; a Cluster organizes Unit references without
+becoming a runtime Unit or a central registry.
+
+`creation = "startup"` starts UART with the selected deployment.
+`requires = ["hub", "router"]` includes its necessary Unit providers in the
+package closure: startup claims the serial device through Hub and its interrupt
+line through Router. `after = ["hub", "router"]` waits for their readiness.
+The host always includes the core System Unit. System completes its internal
+Operator and Identity bootstrap before creating ordinary Units, fulfilling the
+old `Bootstrap::Operator` prerequisite without a separate Operator Unit id or
+a repeated System requirement.
+
+The document retains the shared `service` subtree at `uart`, its exact PART,
+UNPART, BIND, UNBIND and FIND authority, public permission and absent source
+mark. Static namespace bindings, identity aliases/grants, supply bindings,
+construction and retirement remain empty; supervision remains absent, ending
+resident, groups empty and guarded false. RX/TX resources are bound by the
+running provider, as before. The readiness signal retains `unit::READY_MARK`;
+its complete `u64` value exceeds signed 64-bit range and uses a quoted decimal.
+The host tests also check quoted `0x` hexadecimal against the actual Rust mark.
+
+`tests/unit-document` compares every policy field with the actual retained
+`uart_declaration::UNIT`, round-trips the binary record with borrowed strings,
+converts it to the native runtime declaration, and checks the existing Cargo
+binary and `BUILD` contract. The suite uses public Unit revision
+`ad50b803c3bd5cd2ef90010d80badf23551e88d5` for document, record and runtime
+conversion. Its explicit `legacy-unit` alias uses
+`90396f0fda376e0693fb1b9553aa21864d241057` to compare the retained declaration's
+enum types. The production declarations and server keep their existing Unit
+pin and locks. The new suite has its own committed lock containing both public
+Git sources.
+
+After fetching the locked public dependencies once, reproduce the check with
+its dedicated build directory and process lock:
+
+```sh
+source /workspace/.vanllia-tools/env.sh
+cargo fetch --locked --manifest-path tests/unit-document/Cargo.toml
+flock /tmp/uart-unit-document-public-target.lock cargo test --locked --offline \
+  --manifest-path tests/unit-document/Cargo.toml \
+  --target-dir /tmp/uart-unit-document-public-target --target x86_64-unknown-linux-gnu
+```
+
+This check uses public dependencies without a Cargo patch or local Unit path.
+The document does not migrate existing test scenes or change their declaration
+path. See `VALIDATION.md` for executed checks and runtime limits.
+
 ## Publication
 
 All external dependencies use public GitHub full revisions. Root performs
