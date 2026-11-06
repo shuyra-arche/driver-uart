@@ -1,133 +1,37 @@
 # UART Unit
 
-This repository contains the public `uart-api` and `uart-client`, frozen at
-baseline `b690431496b0beaeb5fb7cafb42e60b4c8b38c9d` (Source
-`f488db5538dc8dd8a530346d76e343708a3c5df0`), plus the non-published
-`uart-server` and `uart-declaration` extracted from Source at
-`94e114614bec53424ac55e640fc80cf19a3e7107`. The API and client are shared by
-the UART driver and the Terminal provider so that both sides name the same
-type. Same repository, one set of full-SHA pins.
+UART provides Shuyra's serial RX/TX service. The API and Console client are shared
+with the Terminal provider.
 
-## `uart-api`
+## Layout and contract
 
-`uart_api::frame` owns the single wire type and its names:
+- `api/`: raw-byte frame and RX/TX names.
+- `client/`: discovery and paired Console endpoints.
+- `server/`: UART device adapter, service loop and the `uart` binary.
+- `unit.toml`: startup policy requiring and following Hub and Router.
+- `declaration/`: compatibility Rust Unit/build declarations.
+- `tests/wire/`, `tests/declaration/`, `tests/unit-document/`: host suites.
 
-- `Bytes` — one nonempty run of raw bytes, `1..=MAX`, no header, no count, no
-  terminator; empty is not a value (`Bytes::of(&[])` and an empty cell are
-  `None`).
-- `DRAIN_MAX = 64` — bytes one drain may carry; `MAX = 129` — bytes of one
-  transfer (`const _: () = assert!(DRAIN_MAX <= MAX)`).
-- `ME = "uart"`, `RX = "rx"`, `TX = "tx"` — the two tree tiles and the domain
-  name.
+`Bytes` contains 1 through `MAX = 129` raw bytes, without a header, length prefix
+or terminator; an empty cell is not a value. `DRAIN_MAX = 64` bounds one drain.
+Console discovery succeeds only when both directions resolve, map and bind.
+RX retains IRQ ownership until its pending batch enters the RX ring.
 
-## `uart-client`
+## Build and test
 
-`uart_client::{Console, road, find}` resolve the two tiles into the two rack
-handles: `find` returns `Some(Console)` only when both directions resolve, map
-and bind; any miss is `None`. No console abstraction, no retry policy of its
-own.
-
-## `uart-server`
-
-`uart-server` is the U-state runtime provider plus the thin `uart` binary.
-`uart_server::serve` preserves the Source runtime: the same desk startup,
-two-source wait, TX draining, RX pending batch, IRQ ownership until the batch
-enters the RX ring, rack modes, waits, order and error strings. Provider
-adaptation moves the shared Context/Hub/Device/Fail to the published
-`driver-shared` crate and `Bytes`/names to `uart-api`; `E_UART = 9` remains
-internal. The binary only calls `serve`.
-
-The Source rack probes are integration harnesses and remain in Source. Source
-contained no dedicated historical UART server host suite to copy.
-
-## `uart-declaration`
-
-`uart_declaration::UNIT` is the single `UnitFile` owner for the UART unit,
-retaining the Source namespace operations, startup dependencies, readiness and
-resident ending. `uart_declaration::BUILD` names the `uart-server` package and
-the `uart` binary in `server/Cargo.toml`.
-
-## Wire tests
-
-`tests/wire` is a standalone host workspace (excluded from the package
-workspace) that exercises the actual `uart-api` path:
+Install Rust through rustup; the checkout pins nightly-2026-09-04 and RV64.
 
 ```sh
-cargo test --manifest-path tests/wire/Cargo.toml
+for suite in wire declaration unit-document; do
+  cargo test --locked --manifest-path "tests/$suite/Cargo.toml" --target x86_64-unknown-linux-gnu || exit
+done
+CARGO_TARGET_RISCV64GC_UNKNOWN_NONE_ELF_RUSTFLAGS='-Crelocation-model=static -Cforce-frame-pointers=yes -Ccode-model=medium' \
+  cargo build --locked --release --target riscv64gc-unknown-none-elf -p uart-server --bin uart
 ```
 
-It pins the cross-repository boundary: exact raw bytes with embedded zeros and
-no header, empty and `MAX + 1` rejection, zero-filled valid data, `MAX`
-round-trip, and rejection of a too-short output buffer.
+Uncached dependencies require network access. These host suites check wire and
+declaration contracts, not IRQ delivery, MMIO timing or RX/TX progress.
+Use [Vanllia](https://github.com/shuyra-arche/vanllia) for composed runtime checks.
 
-## Declaration tests
-
-`tests/declaration` is a standalone host workspace (also excluded from the
-package workspace) that exercises the actual declaration crate:
-
-```sh
-cargo test --manifest-path tests/declaration/Cargo.toml
-```
-
-It checks loader identity, the UART namespace and exact operation set, empty
-identity/supply, ordered startup dependencies, readiness signal, resident
-ending, `UNIT.valid()`, and the `BUILD` package/binary contract including the
-manifest path.
-
-## Runtime Unit document
-
-The root `unit.toml` belongs to this UART Unit. Its stable `id` and
-`loader.image` are `uart`, matching the actual binary in the `uart-server`
-package at `server/Cargo.toml`. Build target, profile and features remain in
-the existing `BUILD` declaration; a Cluster organizes Unit references without
-becoming a runtime Unit or a central registry.
-
-`creation = "startup"` starts UART with the selected deployment.
-`requires = ["hub", "router"]` includes its necessary Unit providers in the
-package closure: startup claims the serial device through Hub and its interrupt
-line through Router. `after = ["hub", "router"]` waits for their readiness.
-The host always includes the core System Unit. System completes its internal
-Operator and Identity bootstrap before creating ordinary Units, fulfilling the
-old `Bootstrap::Operator` prerequisite without a separate Operator Unit id or
-a repeated System requirement.
-
-The document retains the shared `service` subtree at `uart`, its exact PART,
-UNPART, BIND, UNBIND and FIND authority, public permission and absent source
-mark. Static namespace bindings, identity aliases/grants, supply bindings,
-construction and retirement remain empty; supervision remains absent, ending
-resident, groups empty and guarded false. RX/TX resources are bound by the
-running provider, as before. The readiness signal retains `unit::READY_MARK`;
-its complete `u64` value exceeds signed 64-bit range and uses a quoted decimal.
-The host tests also check quoted `0x` hexadecimal against the actual Rust mark.
-
-`tests/unit-document` compares every policy field with the actual retained
-`uart_declaration::UNIT`, round-trips the binary record with borrowed strings,
-converts it to the native runtime declaration, and checks the existing Cargo
-binary and `BUILD` contract. The suite uses public Unit revision
-`ad50b803c3bd5cd2ef90010d80badf23551e88d5` for document, record and runtime
-conversion. Its explicit `legacy-unit` alias uses
-`90396f0fda376e0693fb1b9553aa21864d241057` to compare the retained declaration's
-enum types. The production declarations and server keep their existing Unit
-pin and locks. The new suite has its own committed lock containing both public
-Git sources.
-
-After fetching the locked public dependencies once, reproduce the check with
-its dedicated build directory and process lock:
-
-```sh
-source /workspace/.vanllia-tools/env.sh
-cargo fetch --locked --manifest-path tests/unit-document/Cargo.toml
-flock /tmp/uart-unit-document-public-target.lock cargo test --locked --offline \
-  --manifest-path tests/unit-document/Cargo.toml \
-  --target-dir /tmp/uart-unit-document-public-target --target x86_64-unknown-linux-gnu
-```
-
-This check uses public dependencies without a Cargo patch or local Unit path.
-The document does not migrate existing test scenes or change their declaration
-path. See `VALIDATION.md` for executed checks and runtime limits.
-
-## Publication
-
-All external dependencies use public GitHub full revisions. Root performs
-native metadata/offline host and RV validation, independent review and
-publication.
+See [source attribution](PROVENANCE.md) and the
+[organization contribution guide](https://github.com/shuyra-arche/vanllia/blob/main/CONTRIBUTING.md).
